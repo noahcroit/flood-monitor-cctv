@@ -1,0 +1,11 @@
+[Unit]
+Description=Watergate Project Startup Service
+
+[Service]
+WorkingDirectory=/usr/local/sbin
+ExecStart=watergate-startup.sh
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
