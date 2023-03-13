@@ -1,0 +1,6 @@
+classes= 1
+train  = /home/cairlab/computer-vision/darknet-yolo/darknet/data/staffgauge/train.txt
+valid  = /home/cairlab/computer-vision/darknet-yolo/darknet/data/staffgauge/train.txt
+names = /home/cairlab/computer-vision/darknet-yolo/darknet/data/staffgauge/obj.names
+backup = /home/cairlab/computer-vision/darknet-yolo/darknet/data/staffgauge/backup
+
