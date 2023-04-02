@@ -22,7 +22,7 @@ def task_snapshot(queue_snapshot):
         while stream.isOpened():
             ret, frame = stream.read()
             queue_snapshot.put(frame) # put frame into queue
-            time.sleep(2)    # simulate blocking delay
+            time.sleep(1)    # simulate blocking delay
         stream.release()
         snapshot_isrun = False
     except KeyboardInterrupt:
@@ -58,6 +58,16 @@ def task_overlay(queue_roi):
                 h_resize = int(frame.shape[0] * 0.5)
                 dim = (w_resize, h_resize)
                 frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+                
+                # Using cv2.putText() method
+                # font
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                org = (50, 50)
+                fontScale = 1
+                color = (255, 255, 255)
+                thickness = 2
+                level = dict_roi['level']
+                cv2.putText(frame_resize, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
 
                 # draw overlay
                 cv2.imshow("output frame", frame_resize)
@@ -198,19 +208,69 @@ def task_find_roi(queue_in, queue_out):
             
             # write to output buffer after finished the process
             print("Yolo finished")
+
+            # waterlevel calculation
+            if not output_class is None:
+                level = measure_waterlevel(frame_in, pos_x1[0], pos_x2[0], pos_y1[0], pos_y2[0])
+                print("level={}".format(level))
+
             dict_output = {"frame":frame_in, 
                            "class":output_class, 
                            "x1":pos_x1, 
                            "y1":pos_y1, 
                            "x2":pos_x2, 
                            "y2":pos_y2,
-                           "color":classes_color
+                           "color":classes_color,
+                           "level":level
                            }
             queue_out.put(dict_output)
         else:
             print("frame=None")
 
         time.sleep(0.1)
+
+def measure_waterlevel(img, x1, x2, y1, y2):
+    
+    # Crop for only area of staffgauge, ROI should be from the YOLOv4 result
+    img_crop = img[y1:y2, x1:x2]
+
+    # convert to hsv colorspace
+    hsv = cv2.cvtColor(img_crop, cv2.COLOR_BGR2HSV)
+
+    # lower bound and upper bound for Yellow color
+    lower_bound = np.array([20, 130, 130])
+    upper_bound = np.array([50, 255, 255])
+
+    # find the colors within the boundaries
+    mask = cv2.inRange(hsv, lower_bound, upper_bound)
+    
+    # bitwise with mask
+    img_segmented = cv2.bitwise_and(img_crop, img_crop, mask=mask)
+
+    # convert the input image to grayscale
+    gray = cv2.cvtColor(img_segmented, cv2.COLOR_BGR2GRAY)
+    # apply thresholding to convert grayscale to binary image
+    ret, thresh = cv2.threshold(gray, 70, 255, 0)
+
+    # Find the water line
+    # Use sum of grey-value in row of gray-image
+    h_gray = gray.shape[0]
+    w_gray = gray.shape[1]
+    sum_gray = []
+    for row in range(h_gray):
+        tmp = 0
+        for col in range(w_gray):
+            tmp = tmp + gray[row, col]
+        sum_gray.append(tmp)
+    
+    count = sum(sum_gray)
+    
+    # linear regression
+    a = -0.8859
+    b = 102.8
+    count = count / 100000
+    level = a*count + b
+    return round(level, 2)
 
 
 
