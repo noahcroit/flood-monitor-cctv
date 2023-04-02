@@ -57,6 +57,7 @@ if __name__ == "__main__":
         
 
     # convert to pandas's dataframe
+    
     pdata = pd.DataFrame({'img_name': l_name,
                           'base64': l_base64,
                               'x1': l_x1,
@@ -64,7 +65,17 @@ if __name__ == "__main__":
                               'x2': l_x2,
                               'y2': l_y2
                               })
-    # writing to Excel
+    """ 
+    pdata = pd.DataFrame({'img_name': l_name,
+                              'x1': l_x1,
+                              'y1': l_y1,
+                              'x2': l_x2,
+                              'y2': l_y2
+                              })
+                              """
+    # writing to files
     filename_excel = "staffgauge.xlsx"
+    filename_csv = "staffgauge.csv"
     pdata.to_excel(filename_excel)
+    pdata.to_csv(filename_csv, sep=',', encoding='utf-8')
 
