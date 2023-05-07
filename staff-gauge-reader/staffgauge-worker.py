@@ -15,7 +15,8 @@ def task_snapshot(queue_snapshot):
 
     # URL for video or camera source
     #source="rtsp://admin:scadatest1234@192.168.4.197:554/Streaming/Channels/101/"
-    source="videos/00008.mp4"
+    source="videos/site-sample-2.mp4"
+    #source="videos/00008.mp4"
     stream = cv2.VideoCapture(source)
     try:
         # looping
