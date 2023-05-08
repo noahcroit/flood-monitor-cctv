@@ -15,8 +15,8 @@ def task_snapshot(queue_snapshot):
 
     # URL for video or camera source
     #source="rtsp://admin:scadatest1234@192.168.4.197:554/Streaming/Channels/101/"
-    source="rtsp://root:axiscamera@192.168.4.196/axis-media/media.amp"
-    #source="videos/site-sample-2.mp4"
+    #source="rtsp://root:axiscamera@192.168.4.196/axis-media/media.amp"
+    source="videos/site-sample-2.mp4"
     #source="videos/00008.mp4"
     stream = cv2.VideoCapture(source)
     try:
@@ -76,8 +76,10 @@ def task_overlay(queue_roi):
                     cv2.imshow("output frame", frame_resize)
                     cv2.waitKey(1000)
             time.sleep(0.1)
-        except:
+        except Exception as e:
             print("something is wrong in task overlay")
+            print(e)
+
     cv2.destroyAllWindows()
 
 def task_find_roi(queue_in, queue_out):
