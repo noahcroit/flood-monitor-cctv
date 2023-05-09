@@ -6,6 +6,7 @@ import numpy as np
 import argparse
 import json
 import redis
+import base64
 
 
 
@@ -255,7 +256,7 @@ def task_find_roi(queue_in, q_to_overlay, q_to_redis):
 
 def task_json_to_redis(q_redis):
     global snapshot_isrun
-    
+
     # REDIS client
     r = redis.Redis(host='localhost', port=6379, password='ictadmin')
     tagname='tag:watergate.meter-pump-01.P'
@@ -265,8 +266,12 @@ def task_json_to_redis(q_redis):
         try:
             if not q_redis.empty():
                 dict_roi = q_redis.get()
-                json_obj = json.dumps(dict_roi, indent=4) 
-                r.set(tagname, json_obj)
+                ret, buf = cv2.imencode('.jpg', dict_roi['frame'])
+                jpg_byte = base64.b64encode(buf)
+                jpg_str = jpg_byte.decode('UTF-8') 
+                dict_roi['frame'] = jpg_str
+                json_obj = json.dumps(dict_roi, indent=4)
+                #r.set(tagname, json_obj)
 
             time.sleep(0.1)
 
@@ -367,7 +372,7 @@ if __name__ == "__main__":
     t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source))
     t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi, queue_redis))
     t3 = threading.Thread(target=task_overlay, args=(queue_roi, False))
-    t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis))
+    t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis,))
     
     # start tasks
     t1.start()
