@@ -4,6 +4,8 @@ import time
 import cv2
 import numpy as np
 import argparse
+import json
+import redis
 
 
 
@@ -20,7 +22,8 @@ def task_snapshot(queue_snapshot, source):
         # looping
         while stream.isOpened() and snapshot_isrun:
             ret, frame = stream.read()
-            queue_snapshot.put(frame) # put frame into queue
+            if not frame is None:
+                queue_snapshot.put(frame) # put frame into queue
             time.sleep(1)    # simulate blocking delay
         stream.release()
         snapshot_isrun = False
@@ -29,7 +32,7 @@ def task_snapshot(queue_snapshot, source):
         stream.release()
         snapshot_isrun = False
         
-def task_overlay(queue_roi):
+def task_overlay(queue_roi, display_enable):
     global snapshot_isrun
 
     # looping
@@ -45,41 +48,45 @@ def task_overlay(queue_roi):
                 y2 = dict_roi['y2']
                 color = dict_roi['color']
                 print(obj_class)
-                if not obj_class is None:
-                    for i in range(len(obj_class)):
-                        # draw a bounding box rectangle and label on the frame
-                        cv2.rectangle(frame, (x1[i], y1[i]), (x2[i], y2[i]), [102, 220, 225], 2)
-                        #text = "{}: {:.4f}".format(obj_class[i], confidences[i])
-                        text = "{}".format(obj_class[i])
-                        cv2.putText(frame, text, (x1[i], y1[i] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, [102, 220, 225], 5)
 
-                    # resize image frame for 1/2
-                    w_resize = int(frame.shape[1] * 0.5)
-                    h_resize = int(frame.shape[0] * 0.5)
-                    dim = (w_resize, h_resize)
-                    frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
-                    
-                    # Using cv2.putText() method
-                    # font
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    org = (50, 50)
-                    fontScale = 1
-                    color = (255, 255, 255)
-                    thickness = 2
-                    level = dict_roi['level']
-                    cv2.putText(frame_resize, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
+                if display_enable:
+                    if not obj_class is None:
+                        for i in range(len(obj_class)):
+                            # draw a bounding box rectangle and label on the frame
+                            cv2.rectangle(frame, (x1[i], y1[i]), (x2[i], y2[i]), [102, 220, 225], 2)
+                            #text = "{}: {:.4f}".format(obj_class[i], confidences[i])
+                            text = "{}".format(obj_class[i])
+                            cv2.putText(frame, text, (x1[i], y1[i] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, [102, 220, 225], 5)
 
-                    # draw overlay
-                    cv2.imshow("output frame", frame_resize)
+                        # resize image frame for 1/2
+                        w_resize = int(frame.shape[1] * 0.5)
+                        h_resize = int(frame.shape[0] * 0.5)
+                        dim = (w_resize, h_resize)
+                        frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+                        
+                        # Using cv2.putText() method
+                        # font
+                        font = cv2.FONT_HERSHEY_SIMPLEX
+                        org = (50, 50)
+                        fontScale = 1
+                        color = (255, 255, 255)
+                        thickness = 2
+                        level = dict_roi['level']
+                        cv2.putText(frame_resize, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
+
+                        # draw overlay
+                        cv2.imshow("output frame", frame_resize)
                     cv2.waitKey(1000)
+
             time.sleep(0.1)
+
         except Exception as e:
             print("something is wrong in task overlay")
             print(e)
 
     cv2.destroyAllWindows()
 
-def task_find_roi(queue_in, queue_out):
+def task_find_roi(queue_in, q_to_overlay, q_to_redis):
     global snapshot_isrun
 
     # Label File Configuration
@@ -236,7 +243,8 @@ def task_find_roi(queue_in, queue_out):
                                "color":classes_color,
                                "level":level
                                }
-                queue_out.put(dict_output)
+                q_to_overlay.put(dict_output)
+                q_to_redis.put(dict_output)
             else:
                 print("frame=None")
             time.sleep(0.1)
@@ -245,11 +253,31 @@ def task_find_roi(queue_in, queue_out):
             print("something wrong in task YOLO")
             print(e)
 
+def task_json_to_redis(q_redis):
+    global snapshot_isrun
+    
+    # REDIS client
+    r = redis.Redis(host='localhost', port=6379, password='ictadmin')
+    tagname='tag:watergate.meter-pump-01.P'
+    
+    # looping
+    while snapshot_isrun:
+        try:
+            if not q_redis.empty():
+                dict_roi = q_redis.get()
+                json_obj = json.dumps(dict_roi, indent=4) 
+                r.set(tagname, json_obj)
+
+            time.sleep(0.1)
+
+        except Exception as e:
+            print("something wrong in task REDIS")
+            print(e)
+
 def measure_waterlevel(img, x1, x2, y1, y2):
     
     # Crop for only area of staffgauge, ROI should be from the YOLOv4 result
     img_crop = img[y1:y2, x1:x2]
-
     # convert to hsv colorspace
     hsv = cv2.cvtColor(img_crop, cv2.COLOR_BGR2HSV)
 
@@ -288,8 +316,6 @@ def measure_waterlevel(img, x1, x2, y1, y2):
     level = a*count + b
     return round(level, 2)
 
-
-
 if __name__ == "__main__":
     
     # Initialize parser
@@ -327,21 +353,27 @@ if __name__ == "__main__":
     # - ROI Extraction
     # - Snapshot
 
+    # Task: Redis
+    # @Description: Put JSON file of measurement data into REDIS
+
 
 
     # shared queue
     queue_snapshot = queue.Queue()
     queue_roi = queue.Queue()
+    queue_redis = queue.Queue()
 
     # config tasks
     t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source))
-    t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi))
-    t3 = threading.Thread(target=task_overlay, args=(queue_roi,))
+    t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi, queue_redis))
+    t3 = threading.Thread(target=task_overlay, args=(queue_roi, False))
+    t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis))
     
     # start tasks
     t1.start()
     t2.start()
     t3.start()
+    t4.start()
 
     # wait for all threads to finish
     while snapshot_isrun:
@@ -355,6 +387,9 @@ if __name__ == "__main__":
             if not t3.is_alive():
                 print("restart task overlay")
                 t3.start()
+            if not t4.is_alive():
+                print("restart task redis")
+                t4.start()
 
             time.sleep(5)
 
