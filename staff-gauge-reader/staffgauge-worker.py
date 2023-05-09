@@ -3,21 +3,18 @@ import queue
 import time
 import cv2
 import numpy as np
+import argparse
 
 
 
+# Global Variables for Threads 
 snapshot_isrun = True
 
 
 
-def task_snapshot(queue_snapshot):
+def task_snapshot(queue_snapshot, source):
     global snapshot_isrun
 
-    # URL for video or camera source
-    #source="rtsp://admin:scadatest1234@192.168.4.197:554/Streaming/Channels/101/"
-    #source="rtsp://root:axiscamera@192.168.4.196/axis-media/media.amp"
-    source="videos/site-sample-2.mp4"
-    #source="videos/00008.mp4"
     stream = cv2.VideoCapture(source)
     try:
         # looping
@@ -184,13 +181,20 @@ def task_find_roi(queue_in, queue_out):
                 output_class = None
                 pos_x = None
                 pos_y = None
+                pos_x1 = None
+                pos_y1 = None
+                pos_x2 = None
+                pos_y2 = None
+                output_class = None
+                classes_color = None
+
                 # ensure at least one detection exists
                 if len(idxs) > 0:
-                    output_class = []
                     pos_x1 = []
                     pos_y1 = []
                     pos_x2 = []
                     pos_y2 = []
+                    output_class = []
                     classes_color = []
 
                     # loop over the indexes we are keeping
@@ -218,6 +222,7 @@ def task_find_roi(queue_in, queue_out):
                 print("Yolo finished")
 
                 # waterlevel calculation
+                level=None
                 if not output_class is None:
                     level = measure_waterlevel(frame_in, pos_x1[0], pos_x2[0], pos_y1[0], pos_y2[0])
                     print("level={}".format(level))
@@ -234,10 +239,11 @@ def task_find_roi(queue_in, queue_out):
                 queue_out.put(dict_output)
             else:
                 print("frame=None")
-
             time.sleep(0.1)
-        except:
+
+        except Exception as e:
             print("something wrong in task YOLO")
+            print(e)
 
 def measure_waterlevel(img, x1, x2, y1, y2):
     
@@ -286,6 +292,24 @@ def measure_waterlevel(img, x1, x2, y1, y2):
 
 if __name__ == "__main__":
     
+    # Initialize parser
+    parser = argparse.ArgumentParser()
+    # Adding optional argument
+    parser.add_argument("-s", "--source", help="source-type (rtsp, video)")
+
+    # Read arguments from command line
+    args = parser.parse_args()
+
+    # URL for video or camera source
+    if args.source == "rtsp":
+        #source="rtsp://admin:scadatest1234@192.168.4.197:554/Streaming/Channels/101/"
+        source="rtsp://root:axiscamera@192.168.4.196/axis-media/media.amp"
+    if args.source == "video":
+        #source="videos/site-sample-2.mp4"
+        source="videos/00008.mp4"
+
+
+
     # Task: Snapshot
     # @Description: Take snapshot a frame from RTSP camera with opencv, Then queue frame to image queue
     # @Wait for task:
@@ -303,12 +327,14 @@ if __name__ == "__main__":
     # - ROI Extraction
     # - Snapshot
 
+
+
     # shared queue
     queue_snapshot = queue.Queue()
     queue_roi = queue.Queue()
 
     # config tasks
-    t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot,))
+    t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source))
     t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi))
     t3 = threading.Thread(target=task_overlay, args=(queue_roi,))
     
