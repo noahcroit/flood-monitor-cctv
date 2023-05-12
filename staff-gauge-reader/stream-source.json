@@ -1,0 +1,4 @@
+{
+	"rtsp": "rtsp://admin:scadatest1234@192.168.0.14:554/Streaming/Channels/101/",
+	"video": "/videos/00008.mp4"
+}
