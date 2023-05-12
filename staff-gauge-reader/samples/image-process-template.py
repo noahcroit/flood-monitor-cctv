@@ -3,11 +3,12 @@ import queue
 import time
 import cv2
 import numpy as np
+import argparse
+import json
 
 
 
-def task_readframe(buffer_in):
-    source="rtsp://admin:scadatest1234@192.168.4.197:554/Streaming/Channels/101/"
+def task_readframe(buffer_in, source):
     stream = cv2.VideoCapture(source)
     try:
         while stream.isOpened():
@@ -34,14 +35,15 @@ def task_process(queue_in, queue_out):
     except KeyboardInterrupt:
         pass
 
-def task_display(queue_out):
+def task_display(queue_out, displayflag):
     try:
         while True:
             if not queue_out.empty():
                 frame = queue_out.get()
                 if not frame is None:
-                    frame = cv2.resize(frame, (960, 540))
-                    cv2.imshow("output frame", frame)
+                    if displayflag == 'true':
+                        frame = cv2.resize(frame, (960, 540))
+                        cv2.imshow("output frame", frame)
             # Press Q on keyboard to  exit
             cv2.waitKey(10)
 
@@ -63,14 +65,34 @@ def task_qsize(queue):
 
 
 if __name__ == "__main__":
-    # shared queue
+    
+    # Initialize parser
+    parser = argparse.ArgumentParser()
+    # Adding optional argument
+    parser.add_argument("-s", "--source", help="source-type (rtsp, video)")
+    parser.add_argument("-j", "--json", help="JSON file for source path")
+    parser.add_argument("-d", "--displayflag", help="display image with cv or not (true, false)", default='false')
+
+    # Read arguments from command line
+    args = parser.parse_args()
+
+    # URL for video or camera source
+    f = open('stream-source.json')
+    data = json.load(f)
+    if args.source == "rtsp":
+        source = data['rtsp']
+    if args.source == "video":
+        source = data['video']
+    f.close()
+
+    # Queue for frame buffering in image processing
     queue_in   = queue.Queue()
     queue_out  = queue.Queue()
 
     # config tasks
-    t1 = threading.Thread(target=task_readframe, args=(queue_in,))
+    t1 = threading.Thread(target=task_readframe, args=(queue_in, source))
     t2 = threading.Thread(target=task_process, args=(queue_in, queue_out))
-    t3 = threading.Thread(target=task_display, args=(queue_out,))
+    t3 = threading.Thread(target=task_display, args=(queue_out, args.displayflag))
     t4 = threading.Thread(target=task_qsize, args=(queue_out,))
     
     # start tasks
