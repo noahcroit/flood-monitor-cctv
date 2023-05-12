@@ -19,13 +19,13 @@ def task_snapshot(queue_snapshot, source):
     global snapshot_isrun
 
     stream = cv2.VideoCapture(source)
+    print("start capture")
     try:
         # looping
         while stream.isOpened() and snapshot_isrun:
             ret, frame = stream.read()
             if not frame is None:
                 queue_snapshot.put(frame) # put frame into queue
-            time.sleep(1)    # simulate blocking delay
         stream.release()
         snapshot_isrun = False
     except:
@@ -33,7 +33,7 @@ def task_snapshot(queue_snapshot, source):
         stream.release()
         snapshot_isrun = False
         
-def task_overlay(queue_roi, display_enable):
+def task_overlay(queue_roi, displayflag):
     global snapshot_isrun
 
     # looping
@@ -50,7 +50,7 @@ def task_overlay(queue_roi, display_enable):
                 color = dict_roi['color']
                 print(obj_class)
 
-                if display_enable:
+                if displayflag:
                     if not obj_class is None:
                         for i in range(len(obj_class)):
                             # draw a bounding box rectangle and label on the frame
@@ -322,22 +322,25 @@ def measure_waterlevel(img, x1, x2, y1, y2):
     return round(level, 2)
 
 if __name__ == "__main__":
-    
+
     # Initialize parser
     parser = argparse.ArgumentParser()
     # Adding optional argument
     parser.add_argument("-s", "--source", help="source-type (rtsp, video)")
+    parser.add_argument("-j", "--json", help="JSON file for source path")
+    parser.add_argument("-d", "--displayflag", help="display image with cv or not (true, false)", default='false')
 
     # Read arguments from command line
     args = parser.parse_args()
 
     # URL for video or camera source
+    f = open(args.json)
+    data = json.load(f)
     if args.source == "rtsp":
-        #source="rtsp://admin:scadatest1234@192.168.4.197:554/Streaming/Channels/101/"
-        source="rtsp://root:axiscamera@192.168.4.196/axis-media/media.amp"
+        source = data['rtsp']
     if args.source == "video":
-        #source="videos/site-sample-2.mp4"
-        source="videos/00008.mp4"
+        source = data['video']
+    f.close()
 
 
 
@@ -371,7 +374,7 @@ if __name__ == "__main__":
     # config tasks
     t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source))
     t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi, queue_redis))
-    t3 = threading.Thread(target=task_overlay, args=(queue_roi, False))
+    t3 = threading.Thread(target=task_overlay, args=(queue_roi, args.displayflag))
     t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis,))
     
     # start tasks
