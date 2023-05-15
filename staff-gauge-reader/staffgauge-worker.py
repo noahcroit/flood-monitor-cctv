@@ -7,6 +7,7 @@ import argparse
 import json
 import redis
 import base64
+import statistics
 
 
 
@@ -15,7 +16,7 @@ snapshot_isrun = True
 
 
 
-def task_snapshot(queue_snapshot, source):
+def task_snapshot(queue_snapshot, source, source_type):
     global snapshot_isrun
 
     stream = cv2.VideoCapture(source)
@@ -26,6 +27,8 @@ def task_snapshot(queue_snapshot, source):
             ret, frame = stream.read()
             if not frame is None:
                 queue_snapshot.put(frame) # put frame into queue
+            if source_type == 'video':
+                time.sleep(0.5) # slow down the snapshot in video mode to prevent memory usage creep
         stream.release()
         snapshot_isrun = False
     except:
@@ -50,7 +53,7 @@ def task_overlay(queue_roi, displayflag):
                 color = dict_roi['color']
                 print(obj_class)
 
-                if displayflag:
+                if displayflag == 'true':
                     if not obj_class is None:
                         for i in range(len(obj_class)):
                             # draw a bounding box rectangle and label on the frame
@@ -87,7 +90,7 @@ def task_overlay(queue_roi, displayflag):
 
     cv2.destroyAllWindows()
 
-def task_find_roi(queue_in, q_to_overlay, q_to_redis):
+def task_find_roi(queue_in, q_to_overlay, q_to_redis, coeff):
     global snapshot_isrun
 
     # Label File Configuration
@@ -232,7 +235,7 @@ def task_find_roi(queue_in, q_to_overlay, q_to_redis):
                 # waterlevel calculation
                 level=None
                 if not output_class is None:
-                    level = measure_waterlevel(frame_in, pos_x1[0], pos_x2[0], pos_y1[0], pos_y2[0])
+                    level = measure_waterlevel(frame_in, pos_x1[0], pos_x2[0], pos_y1[0], pos_y2[0], coeff)
                     print("level={}".format(level))
 
                 dict_output = {"frame":frame_in, 
@@ -254,7 +257,7 @@ def task_find_roi(queue_in, q_to_overlay, q_to_redis):
             print("something wrong in task YOLO")
             print(e)
 
-def task_json_to_redis(q_redis):
+def task_json_to_redis(q_redis, tagname):
     global snapshot_isrun
 
     # REDIS client
@@ -279,7 +282,7 @@ def task_json_to_redis(q_redis):
             print("something wrong in task REDIS")
             print(e)
 
-def measure_waterlevel(img, x1, x2, y1, y2):
+def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     
     # Crop for only area of staffgauge, ROI should be from the YOLOv4 result
     img_crop = img[y1:y2, x1:x2]
@@ -311,15 +314,57 @@ def measure_waterlevel(img, x1, x2, y1, y2):
         for col in range(w_gray):
             tmp = tmp + gray[row, col]
         sum_gray.append(tmp)
+
+    # Find mean and STD of gray value to calculate the threshold
+    mean = statistics.mean(sum_gray)
+    std  = statistics.stdev(sum_gray)
+    threshold = (mean - std)*0.8
+
+    # Filter the sum_gray waveform
+    sum_gray_filter = []
+    yd = 0
+    y  = 0
+    x  = 0
+    a_filter  = 0.2
+    waterline_row = []
+    edge_state=0
+    for row in range(h_gray):
+        x = sum_gray[row]
+        y = a_filter*x + (1 - a_filter)*yd # Run filter
+        yd = y
+        sum_gray_filter.append(y)
+        # Thresholding to find the staffgauge line
+        if edge_state == 0:
+            if y > threshold:
+                waterline_row.append(row)
+                edge_state = 1
+        elif edge_state == 1:
+            if y < threshold:
+                waterline_row.append(row)
+                edge_state = 2
     
-    count = sum(sum_gray)
+    if len(waterline_row) == 2:
+        print("from total {}, detect head, water = {}, {}".format(h_gray, waterline_row[0], waterline_row[1]))
+        staffgauge_len = waterline_row[1] - waterline_row[0]
+    else:
+        print("can't find waterline")
+        staffgauge_len = h_gray
     
+    # Normalization with image size
+    staffgauge_len = staffgauge_len/img.shape[0]
+
     # linear regression
-    a = -0.8859
-    b = 102.8
-    count = count / 100000
-    level = a*count + b
+    level = linear_regression(staffgauge_len, coeff)
+
     return round(level, 2)
+
+def linear_regression(x, coeff):
+    a = coeff['a']
+    b = coeff['b']
+    y = a*x + b
+    return y
+
+
 
 if __name__ == "__main__":
 
@@ -327,7 +372,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     # Adding optional argument
     parser.add_argument("-s", "--source", help="source-type (rtsp, video)")
-    parser.add_argument("-j", "--json", help="JSON file for source path")
+    parser.add_argument("-j", "--json", help="JSON file for the configuration")
     parser.add_argument("-d", "--displayflag", help="display image with cv or not (true, false)", default='false')
 
     # Read arguments from command line
@@ -340,6 +385,7 @@ if __name__ == "__main__":
         source = data['rtsp']
     if args.source == "video":
         source = data['video']
+    tagname = data['tagname']
     f.close()
 
 
@@ -372,16 +418,16 @@ if __name__ == "__main__":
     queue_redis = queue.Queue()
 
     # config tasks
-    t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source))
-    t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi, queue_redis))
+    t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source, args.source))
+    t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi, queue_redis, data['coeff']))
     t3 = threading.Thread(target=task_overlay, args=(queue_roi, args.displayflag))
-    t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis,))
+    #t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis, tagname))
     
     # start tasks
     t1.start()
     t2.start()
     t3.start()
-    t4.start()
+    #t4.start()
 
     # wait for all threads to finish
     while snapshot_isrun:
@@ -395,9 +441,9 @@ if __name__ == "__main__":
             if not t3.is_alive():
                 print("restart task overlay")
                 t3.start()
-            if not t4.is_alive():
-                print("restart task redis")
-                t4.start()
+            #if not t4.is_alive():
+            #    print("restart task redis")
+            #    t4.start()
 
             time.sleep(5)
 
