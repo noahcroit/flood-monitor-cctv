@@ -7,7 +7,6 @@ import argparse
 import json
 import redis
 import base64
-import statistics
 
 
 
@@ -28,7 +27,7 @@ def task_snapshot(queue_snapshot, source, source_type):
             if not frame is None:
                 queue_snapshot.put(frame) # put frame into queue
             if source_type == 'video':
-                time.sleep(0.5) # slow down the snapshot in video mode to prevent memory usage creep
+                time.sleep(1.5) # slow down the snapshot in video mode to prevent memory usage creep
         stream.release()
         snapshot_isrun = False
     except:
@@ -316,10 +315,10 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
         sum_gray.append(tmp)
 
     # Find mean and STD of gray value to calculate the threshold
-    mean = statistics.mean(sum_gray)
-    std  = statistics.stdev(sum_gray)
+    mean = np.mean(sum_gray)
+    std  = np.std(sum_gray)
     threshold = (mean - std)*0.8
-
+    
     # Filter the sum_gray waveform
     sum_gray_filter = []
     yd = 0
@@ -355,7 +354,7 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
 
     # linear regression
     level = linear_regression(staffgauge_len, coeff)
-
+    
     return round(level, 2)
 
 def linear_regression(x, coeff):
@@ -448,6 +447,6 @@ if __name__ == "__main__":
             time.sleep(5)
 
         except KeyboardInterrupt:
-            print("main thread interrupted. Stop snaptshot")
+            print("main thread interrupted. Stop snapshot")
             snapshot_isrun = False
 
