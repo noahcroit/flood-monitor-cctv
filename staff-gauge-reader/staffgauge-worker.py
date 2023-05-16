@@ -12,7 +12,8 @@ import base64
 
 # Global Variables for Threads 
 snapshot_isrun = True
-
+frame_yolo = None
+lock = threading.Lock()
 
 
 def task_snapshot(queue_snapshot, source, source_type):
@@ -37,6 +38,7 @@ def task_snapshot(queue_snapshot, source, source_type):
         
 def task_overlay(queue_roi, displayflag):
     global snapshot_isrun
+    global frame_yolo
 
     # looping
     while snapshot_isrun:
@@ -52,34 +54,48 @@ def task_overlay(queue_roi, displayflag):
                 color = dict_roi['color']
                 print(obj_class)
 
-                if displayflag == 'true':
-                    if not obj_class is None:
-                        for i in range(len(obj_class)):
-                            # draw a bounding box rectangle and label on the frame
-                            cv2.rectangle(frame, (x1[i], y1[i]), (x2[i], y2[i]), [102, 220, 225], 2)
-                            #text = "{}: {:.4f}".format(obj_class[i], confidences[i])
-                            text = "{}".format(obj_class[i])
-                            cv2.putText(frame, text, (x1[i], y1[i] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, [102, 220, 225], 5)
+                if not obj_class is None:
+                    if not type(obj_class) is list:
+                        obj_class = [obj_class]
+                        x1 = [x1]
+                        y1 = [y1]
+                        x2 = [x2]
+                        y2 = [y2]
+                        color = [color]
 
-                        # resize image frame for 1/2
-                        w_resize = int(frame.shape[1] * 0.5)
-                        h_resize = int(frame.shape[0] * 0.5)
-                        dim = (w_resize, h_resize)
-                        frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
-                        
-                        # Using cv2.putText() method
-                        # font
-                        font = cv2.FONT_HERSHEY_SIMPLEX
-                        org = (50, 50)
-                        fontScale = 1
-                        color = (255, 255, 255)
-                        thickness = 2
-                        level = dict_roi['level']
-                        cv2.putText(frame_resize, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
+                    for i in range(len(obj_class)):
+                        # draw a bounding box rectangle and label on the frame
+                        cv2.rectangle(frame, (x1[i], y1[i]), (x2[i], y2[i]), [102, 220, 225], 2)
+                        #text = "{}: {:.4f}".format(obj_class[i], confidences[i])
+                        text = "{}".format(obj_class[i])
+                        cv2.putText(frame, text, (x1[i], y1[i] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, [102, 220, 225], 5)
+                    
+                    # resize image frame for 1/2
+                    w_resize = int(frame.shape[1] * 0.5)
+                    h_resize = int(frame.shape[0] * 0.5)
+                    dim = (w_resize, h_resize)
+                    frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+                    
+                    # Using cv2.putText() method
+                    # font
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    org = (50, 50)
+                    fontScale = 1
+                    color = (255, 255, 255)
+                    thickness = 2
+                    level = dict_roi['level']
+                    cv2.putText(frame_resize, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
 
+                    # global frame for yolo debug
+                    frame_yolo = frame_resize
+
+                    if displayflag == 'true':
                         # draw overlay
                         cv2.imshow("output frame", frame_resize)
-                    cv2.waitKey(1000)
+                        cv2.waitKey(1000)
+                else:
+                    # global frame for yolo debug
+                    frame_yolo = frame
 
             time.sleep(0.1)
 
@@ -238,12 +254,12 @@ def task_find_roi(queue_in, q_to_overlay, q_to_redis, coeff):
                     print("level={}".format(level))
 
                 dict_output = {"frame":frame_in, 
-                               "class":output_class[0], 
-                               "x1":pos_x1[0], 
-                               "y1":pos_y1[0], 
-                               "x2":pos_x2[0], 
-                               "y2":pos_y2[0],
-                               "color":classes_color[0],
+                               "class":output_class, 
+                               "x1":pos_x1, 
+                               "y1":pos_y1, 
+                               "x2":pos_x2, 
+                               "y2":pos_y2,
+                               "color":classes_color,
                                "level":level
                                }
                 q_to_overlay.put(dict_output)
@@ -266,13 +282,29 @@ def task_json_to_redis(q_redis, tagname):
     while snapshot_isrun:
         try:
             if not q_redis.empty():
+                # Read dict and select only the first detection
                 dict_roi = q_redis.get()
+                if type(dict_roi['class']) is list:
+                    dict_roi['class'] = dict_roi['class'][0]
+                    dict_roi['x1'] = dict_roi['x1'][0]
+                    dict_roi['y1'] = dict_roi['y1'][0]
+                    dict_roi['x2'] = dict_roi['x2'][0]
+                    dict_roi['y2'] = dict_roi['y2'][0]
+                    dict_roi['color'] = dict_roi['color'][0]
+
+                # base64 encoder
                 ret, buf = cv2.imencode('.jpg', dict_roi['frame'])
                 jpg_byte = base64.b64encode(buf)
                 jpg_str = jpg_byte.decode('UTF-8') 
                 dict_roi['frame'] = jpg_str
                 json_obj = json.dumps(dict_roi, indent=4)
                 r.set(tagname, json_obj)
+
+                # For YOLO frame with overlay
+                ret, but = cv2.imencode('.jpg', frame_yolo)
+                jpg_byte = base64.b64encode(buf)
+                jpg_str = jpg_byte.decode('UTF-8') 
+                r.set("tag:watergate.cctv.live-image", jpg_str)
 
             time.sleep(0.1)
 
