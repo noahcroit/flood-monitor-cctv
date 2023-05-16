@@ -1,0 +1,13 @@
+[Unit]
+Description=Staffgauge Worker
+After=multi-user.target
+
+[Service]
+Type=simple
+ExecStart=/usr/local/sbin/staffgauge-worker.sh
+Environment="PYTHONPATH=$PYTHONPATH:/home/watergate/.local/lib/python3.9/site-packages"
+WatchdogSec=120
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
