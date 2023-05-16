@@ -238,12 +238,12 @@ def task_find_roi(queue_in, q_to_overlay, q_to_redis, coeff):
                     print("level={}".format(level))
 
                 dict_output = {"frame":frame_in, 
-                               "class":output_class, 
-                               "x1":pos_x1, 
-                               "y1":pos_y1, 
-                               "x2":pos_x2, 
-                               "y2":pos_y2,
-                               "color":classes_color,
+                               "class":output_class[0], 
+                               "x1":pos_x1[0], 
+                               "y1":pos_y1[0], 
+                               "x2":pos_x2[0], 
+                               "y2":pos_y2[0],
+                               "color":classes_color[0],
                                "level":level
                                }
                 q_to_overlay.put(dict_output)
@@ -261,7 +261,6 @@ def task_json_to_redis(q_redis, tagname):
 
     # REDIS client
     r = redis.Redis(host='localhost', port=6379, password='ictadmin')
-    tagname='tag:watergate.meter-pump-01.P'
     
     # looping
     while snapshot_isrun:
@@ -273,7 +272,7 @@ def task_json_to_redis(q_redis, tagname):
                 jpg_str = jpg_byte.decode('UTF-8') 
                 dict_roi['frame'] = jpg_str
                 json_obj = json.dumps(dict_roi, indent=4)
-                #r.set(tagname, json_obj)
+                r.set(tagname, json_obj)
 
             time.sleep(0.1)
 
@@ -420,13 +419,13 @@ if __name__ == "__main__":
     t1 = threading.Thread(target=task_snapshot, args=(queue_snapshot, source, args.source))
     t2 = threading.Thread(target=task_find_roi, args=(queue_snapshot, queue_roi, queue_redis, data['coeff']))
     t3 = threading.Thread(target=task_overlay, args=(queue_roi, args.displayflag))
-    #t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis, tagname))
+    t4 = threading.Thread(target=task_json_to_redis, args=(queue_redis, tagname))
     
     # start tasks
     t1.start()
     t2.start()
     t3.start()
-    #t4.start()
+    t4.start()
 
     # wait for all threads to finish
     while snapshot_isrun:
@@ -440,9 +439,9 @@ if __name__ == "__main__":
             if not t3.is_alive():
                 print("restart task overlay")
                 t3.start()
-            #if not t4.is_alive():
-            #    print("restart task redis")
-            #    t4.start()
+            if not t4.is_alive():
+                print("restart task redis")
+                t4.start()
 
             time.sleep(5)
 
