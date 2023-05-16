@@ -71,10 +71,10 @@ def task_overlay(queue_roi, displayflag):
                         cv2.putText(frame, text, (x1[i], y1[i] - 5), cv2.FONT_HERSHEY_SIMPLEX, 1.5, [102, 220, 225], 5)
                     
                     # resize image frame for 1/2
-                    w_resize = int(frame.shape[1] * 0.5)
-                    h_resize = int(frame.shape[0] * 0.5)
-                    dim = (w_resize, h_resize)
-                    frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
+                    #w_resize = int(frame.shape[1] * 0.5)
+                    #h_resize = int(frame.shape[0] * 0.5)
+                    #dim = (w_resize, h_resize)
+                    #frame_resize = cv2.resize(frame, dim, interpolation=cv2.INTER_AREA)
                     
                     # Using cv2.putText() method
                     # font
@@ -84,10 +84,10 @@ def task_overlay(queue_roi, displayflag):
                     color = (255, 255, 255)
                     thickness = 2
                     level = dict_roi['level']
-                    cv2.putText(frame_resize, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
+                    cv2.putText(frame, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
 
                     # global frame for yolo debug
-                    frame_yolo = frame_resize
+                    frame_yolo = frame
 
                     if displayflag == 'true':
                         # draw overlay
