@@ -300,11 +300,12 @@ def task_json_to_redis(q_redis, tagname):
                 json_obj = json.dumps(dict_roi, indent=4)
                 r.set(tagname, json_obj)
 
-                # For YOLO frame with overlay
+                # For YOLO frame with overlay and waterlevel
                 ret, but = cv2.imencode('.jpg', frame_yolo)
                 jpg_byte = base64.b64encode(buf)
                 jpg_str = jpg_byte.decode('UTF-8') 
                 r.set("tag:watergate.cctv.live-image", jpg_str)
+                r.set("tag:watergate.cctv-waterlevel.waterlevel", dict_roi['level'])
 
             time.sleep(0.1)
 
