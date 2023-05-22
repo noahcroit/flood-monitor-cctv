@@ -41,17 +41,18 @@ def task_overlay(queue_roi, displayflag):
     global frame_yolo
 
     # looping
+    time.sleep(1)
     while snapshot_isrun:
         try:
             if not queue_roi.empty():
-                dict_roi = queue_roi.get()
-                frame = dict_roi['frame']
-                obj_class = dict_roi['class']
-                x1 = dict_roi['x1']
-                y1 = dict_roi['y1']
-                x2 = dict_roi['x2']
-                y2 = dict_roi['y2']
-                color = dict_roi['color']
+                roi = queue_roi.get()
+                frame = roi['frame']
+                obj_class = roi['class']
+                x1 = roi['x1']
+                y1 = roi['y1']
+                x2 = roi['x2']
+                y2 = roi['y2']
+                color = roi['color']
                 print(obj_class)
 
                 if not obj_class is None:
@@ -64,6 +65,7 @@ def task_overlay(queue_roi, displayflag):
                         color = [color]
 
                     for i in range(len(obj_class)):
+                        print(type(frame))
                         # draw a bounding box rectangle and label on the frame
                         cv2.rectangle(frame, (x1[i], y1[i]), (x2[i], y2[i]), [102, 220, 225], 2)
                         #text = "{}: {:.4f}".format(obj_class[i], confidences[i])
@@ -83,7 +85,7 @@ def task_overlay(queue_roi, displayflag):
                     fontScale = 1
                     color = (255, 255, 255)
                     thickness = 2
-                    level = dict_roi['level']
+                    level = roi['level']
                     cv2.putText(frame, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
 
                     # global frame for yolo debug
@@ -91,7 +93,7 @@ def task_overlay(queue_roi, displayflag):
 
                     if displayflag == 'true':
                         # draw overlay
-                        cv2.imshow("output frame", frame_resize)
+                        cv2.imshow("output frame", frame_yolo)
                         cv2.waitKey(1000)
                 else:
                     # global frame for yolo debug
@@ -274,15 +276,24 @@ def task_find_roi(queue_in, q_to_overlay, q_to_redis, coeff):
 
 def task_json_to_redis(q_redis, tagname):
     global snapshot_isrun
-
+    
     # REDIS client
-    r = redis.Redis(host='localhost', port=6379, password='ictadmin')
+    #r = redis.Redis(host='localhost', port=6379, password='ictadmin')
     
     # looping
+    time.sleep(2)
     while snapshot_isrun:
         try:
             if not q_redis.empty():
-                # Read dict and select only the first detection
+                # For YOLO frame with overlay and waterlevel
+                #ret, but = cv2.imencode('.jpg', frame_yolo)
+                #jpg_byte = base64.b64encode(buf)
+                #jpg_str = jpg_byte.decode('UTF-8') 
+                #r.set("tag:watergate.cctv.live-image", jpg_str)
+                #r.set("tag:watergate.cctv-waterlevel.waterlevel", dict_roi['level'])
+
+                # Read dict and select only the first staffgauge detection
+                lock.acquire()
                 dict_roi = q_redis.get()
                 if type(dict_roi['class']) is list:
                     dict_roi['class'] = dict_roi['class'][0]
@@ -291,23 +302,36 @@ def task_json_to_redis(q_redis, tagname):
                     dict_roi['x2'] = dict_roi['x2'][0]
                     dict_roi['y2'] = dict_roi['y2'][0]
                     dict_roi['color'] = dict_roi['color'][0]
+                x1 = dict_roi['x1']
+                x2 = dict_roi['x2']
+                y1 = dict_roi['y1']
+                y2 = dict_roi['y2']
+                level=dict_roi['level']
+                frame_tmp = dict_roi['frame']
+                lock.release()
 
                 # base64 encoder
-                ret, buf = cv2.imencode('.jpg', dict_roi['frame'])
+                resolution = frame_tmp.shape[0]
+                ret, buf = cv2.imencode('.jpg', frame_tmp)
                 jpg_byte = base64.b64encode(buf)
                 jpg_str = jpg_byte.decode('UTF-8') 
-                dict_roi['frame'] = jpg_str
-                json_obj = json.dumps(dict_roi, indent=4)
-                r.set(tagname, json_obj)
 
-                # For YOLO frame with overlay and waterlevel
-                ret, but = cv2.imencode('.jpg', frame_yolo)
-                jpg_byte = base64.b64encode(buf)
-                jpg_str = jpg_byte.decode('UTF-8') 
-                r.set("tag:watergate.cctv.live-image", jpg_str)
-                r.set("tag:watergate.cctv-waterlevel.waterlevel", dict_roi['level'])
-
-            time.sleep(0.1)
+                #json_obj = json.dumps(dict_roi, indent=4)
+                #r.set(tagname, json_obj)
+                # Recreate dictionary to the app's format
+                message = {
+                        "type":"notify_tag",
+                        "tag":"watergate.cctv.overlay",
+                        "value":{
+                            "coor":{"X1":x1,"Y1":y1,"X2":x2,"Y2":y2},
+                            "resolution":resolution,
+                            "waterlevel":level,
+                            "timestamp":"2023-03-14 16:03:58",
+                            "base64":""
+                            }
+                        }
+                print(message)
+            time.sleep(0.5)
 
         except Exception as e:
             print("something wrong in task REDIS")
