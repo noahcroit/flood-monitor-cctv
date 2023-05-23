@@ -319,6 +319,8 @@ def task_json_to_redis(q_redis, tagname):
                 #json_obj = json.dumps(dict_roi, indent=4)
                 #r.set(tagname, json_obj)
                 # Recreate dictionary to the app's format
+                import datetime
+                date = datetime.datetime.now()
                 message = {
                         "type":"notify_tag",
                         "tag":"watergate.cctv.overlay",
@@ -326,7 +328,7 @@ def task_json_to_redis(q_redis, tagname):
                             "coor":{"X1":x1,"Y1":y1,"X2":x2,"Y2":y2},
                             "resolution":resolution,
                             "waterlevel":level,
-                            "timestamp":"2023-03-14 16:03:58",
+                            "timestamp":str(date),
                             "base64":""
                             }
                         }
