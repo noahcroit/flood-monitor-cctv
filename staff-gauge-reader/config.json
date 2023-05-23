@@ -1,6 +1,6 @@
 {
 	"rtsp": "rtsp://admin:scadatest1234@192.168.0.11:554/Streaming/Channels/101/",
-	"video": "videos/site-sample-3.mp4",
-	"coeff": {"a": 375.7, "b": 0},
+	"video": "videos/site-sample-6.mp4",
+	"coeff": {"a1": 2.43, "a0": 0},
 	"tagname": "tag:watergate.cctv-waterlevel.overlay"
 }
