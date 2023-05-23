@@ -81,12 +81,12 @@ def task_overlay(queue_roi, displayflag):
                     # Using cv2.putText() method
                     # font
                     font = cv2.FONT_HERSHEY_SIMPLEX
-                    org = (50, 50)
-                    fontScale = 1
-                    color = (255, 255, 255)
-                    thickness = 2
+                    org = (100, 150)
+                    fontScale = 2
+                    color = (30, 230, 230)
+                    thickness = 5
                     level = roi['level']
-                    cv2.putText(frame, 'waterlevel={}'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
+                    cv2.putText(frame, 'staffgauge len={}m'.format(level), org, font, fontScale, color, thickness, cv2.LINE_AA)
 
                     # global frame for yolo debug
                     frame_yolo = frame
@@ -404,20 +404,24 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     else:
         print("can't find waterline")
         staffgauge_len = h_gray
-    
-    # Normalization with image size
-    staffgauge_len = staffgauge_len/img.shape[0]
 
+    # find actual lenght (meter) with linear regression model
+    len_meter = regression_model_staffgauge(staffgauge_len, img.shape[0], coeff)
+
+    return round(len_meter, 2)
+
+def regression_model_staffgauge(staffgauge_len, frame_height, coeff):
+    a0 = coeff['a0']
+    a1 = coeff['a1']
+    
+    # normalized with frame height so image resolution can be changed
+    staffgauge_len = staffgauge_len / frame_height
+    print("normalized staffgauge len:{}".format(staffgauge_len))
+    
     # linear regression
-    level = linear_regression(staffgauge_len, coeff)
-    
-    return round(level, 2)
+    len_meter = a1*staffgauge_len + a0
 
-def linear_regression(x, coeff):
-    a = coeff['a']
-    b = coeff['b']
-    y = a*x + b
-    return y
+    return len_meter
 
 
 
@@ -426,8 +430,8 @@ if __name__ == "__main__":
     # Initialize parser
     parser = argparse.ArgumentParser()
     # Adding optional argument
-    parser.add_argument("-s", "--source", help="source-type (rtsp, video)")
-    parser.add_argument("-j", "--json", help="JSON file for the configuration")
+    parser.add_argument("-s", "--source", help="source-type (rtsp, video)", default='video')
+    parser.add_argument("-j", "--json", help="JSON file for the configuration", default='config.json')
     parser.add_argument("-d", "--displayflag", help="display image with cv or not (true, false)", default='false')
 
     # Read arguments from command line
