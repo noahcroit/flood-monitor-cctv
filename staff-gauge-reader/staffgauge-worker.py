@@ -288,7 +288,8 @@ def task_json_to_redis(q_redis, tagname):
                 # For YOLO frame with overlay and waterlevel
                 #ret, but = cv2.imencode('.jpg', frame_yolo)
                 #jpg_byte = base64.b64encode(buf)
-                #jpg_str = jpg_byte.decode('UTF-8') 
+                #jpg_str = jpg_byte.decode('UTF-8')
+                # Send base64 to REDIS for overlayed image
                 #r.set("tag:watergate.cctv.live-image", jpg_str)
                 #r.set("tag:watergate.cctv-waterlevel.waterlevel", dict_roi['level'])
 
@@ -316,8 +317,6 @@ def task_json_to_redis(q_redis, tagname):
                 jpg_byte = base64.b64encode(buf)
                 jpg_str = jpg_byte.decode('UTF-8') 
 
-                #json_obj = json.dumps(dict_roi, indent=4)
-                #r.set(tagname, json_obj)
                 # Recreate dictionary to the app's format
                 import datetime
                 date = datetime.datetime.now()
@@ -332,7 +331,13 @@ def task_json_to_redis(q_redis, tagname):
                             "base64":""
                             }
                         }
-                print(message)
+                json_dict = {
+                        "message":message
+                        }
+                json_obj = json.dumps(json_dict, indent=4)
+
+                # Send JSON message to Server and App
+                #r.set(tagname, json_obj)
             time.sleep(0.5)
 
         except Exception as e:
