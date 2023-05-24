@@ -278,21 +278,13 @@ def task_json_to_redis(q_redis, tagname):
     global snapshot_isrun
     
     # REDIS client
-    #r = redis.Redis(host='localhost', port=6379, password='ictadmin')
+    r = redis.Redis(host='localhost', port=6379, password='ictadmin')
     
     # looping
     time.sleep(2)
     while snapshot_isrun:
         try:
             if not q_redis.empty():
-                # For YOLO frame with overlay and waterlevel
-                #ret, but = cv2.imencode('.jpg', frame_yolo)
-                #jpg_byte = base64.b64encode(buf)
-                #jpg_str = jpg_byte.decode('UTF-8')
-                # Send base64 to REDIS for overlayed image
-                #r.set("tag:watergate.cctv.live-image", jpg_str)
-                #r.set("tag:watergate.cctv-waterlevel.waterlevel", dict_roi['level'])
-
                 # Read dict and select only the first staffgauge detection
                 lock.acquire()
                 dict_roi = q_redis.get()
@@ -311,6 +303,14 @@ def task_json_to_redis(q_redis, tagname):
                 frame_tmp = dict_roi['frame']
                 lock.release()
 
+                # For YOLO frame with overlay and waterlevel
+                ret, buf = cv2.imencode('.jpg', frame_yolo)
+                jpg_byte = base64.b64encode(buf)
+                jpg_str = jpg_byte.decode('UTF-8')
+                # Send base64 to REDIS for overlayed image
+                r.set("tag:watergate.cctv.live-image", jpg_str)
+                r.set("tag:watergate.cctv-waterlevel.waterlevel", level)
+
                 # base64 encoder
                 resolution = frame_tmp.shape[0]
                 ret, buf = cv2.imencode('.jpg', frame_tmp)
@@ -320,6 +320,7 @@ def task_json_to_redis(q_redis, tagname):
                 # Recreate dictionary to the app's format
                 import datetime
                 date = datetime.datetime.now()
+                """
                 message = {
                         "type":"notify_tag",
                         "tag":"watergate.cctv.overlay",
@@ -334,10 +335,19 @@ def task_json_to_redis(q_redis, tagname):
                 json_dict = {
                         "message":message
                         }
-                json_obj = json.dumps(json_dict, indent=4)
+                """
+                value = {
+                    "coor":{"X1":x1,"Y1":y1,"X2":x2,"Y2":y2},
+                    "resolution":resolution,
+                    "waterlevel":level,
+                    "timestamp":str(date),
+                    "base64":jpg_str
+                }
+                
+                json_obj = json.dumps(value, indent=4)
 
                 # Send JSON message to Server and App
-                #r.set(tagname, json_obj)
+                r.set(tagname, json_obj)
             time.sleep(0.5)
 
         except Exception as e:
