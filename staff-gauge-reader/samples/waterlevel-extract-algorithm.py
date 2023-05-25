@@ -56,8 +56,8 @@ def measure_staffgauge_len(image_path):
     cv2.imshow("Binary Image", thresh)
     cv2.waitKey(0)
 
-    # apply filling to binary image
-    kernel_size = (7, 7)
+    # apply hole filling to binary image
+    kernel_size = (5, 5)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     cv2.imshow("Filling Image", closing)
@@ -65,13 +65,13 @@ def measure_staffgauge_len(image_path):
 
     # Find the water line
     # Use sum of grey-value in row of gray-image
-    h_gray = gray.shape[0]
-    w_gray = gray.shape[1]
+    h_gray = closing.shape[0]
+    w_gray = closing.shape[1]
     sum_gray = []
     for row in range(h_gray):
         tmp = 0
         for col in range(w_gray):
-            tmp = tmp + gray[row, col]
+            tmp = tmp + closing[row, col]
         sum_gray.append(tmp)
     mean = statistics.mean(sum_gray)
     std  = statistics.stdev(sum_gray)
@@ -83,7 +83,7 @@ def measure_staffgauge_len(image_path):
     x  = 0
     a  = 0.2
     waterline_row = []
-    threshold = (mean - std)*0.65
+    threshold = (mean - std)*0.4
     edge_state=0
     for row in range(h_gray):
         x = sum_gray[row]
