@@ -362,8 +362,8 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     hsv = cv2.cvtColor(img_crop, cv2.COLOR_BGR2HSV)
 
     # lower bound and upper bound for Yellow color
-    lower_bound = np.array([20, 130, 130])
-    upper_bound = np.array([50, 255, 255])
+    lower_bound = np.array([20, 90, 90])
+    upper_bound = np.array([30, 255, 255])
 
     # find the colors within the boundaries
     mask = cv2.inRange(hsv, lower_bound, upper_bound)
@@ -374,32 +374,37 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     # convert the input image to grayscale
     gray = cv2.cvtColor(img_segmented, cv2.COLOR_BGR2GRAY)
     # apply thresholding to convert grayscale to binary image
-    ret, thresh = cv2.threshold(gray, 70, 255, 0)
+    ret, img_binary = cv2.threshold(gray, 70, 255, 0)
+
+    # apply hole filling to binary image
+    kernel_size = (5, 5)
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
+    closing = cv2.morphologyEx(img_binary, cv2.MORPH_CLOSE, kernel)
 
     # Find the water line
     # Use sum of grey-value in row of gray-image
-    h_gray = gray.shape[0]
-    w_gray = gray.shape[1]
+    h_gray = closing.shape[0]
+    w_gray = closing.shape[1]
     sum_gray = []
     for row in range(h_gray):
         tmp = 0
         for col in range(w_gray):
-            tmp = tmp + gray[row, col]
+            tmp = tmp + closing[row, col]
         sum_gray.append(tmp)
 
     # Find mean and STD of gray value to calculate the threshold
     mean = np.mean(sum_gray)
     std  = np.std(sum_gray)
-    threshold = (mean - std)*0.8
+    threshold = (mean - std)*0.4
     
     # Filter the sum_gray waveform
     sum_gray_filter = []
     yd = 0
     y  = 0
     x  = 0
-    a_filter  = 0.2
-    waterline_row = []
-    edge_state=0
+    a_filter = 0.2
+    edge_state = 0
+    line_row = []
     for row in range(h_gray):
         x = sum_gray[row]
         y = a_filter*x + (1 - a_filter)*yd # Run filter
@@ -408,18 +413,21 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
         # Thresholding to find the staffgauge line
         if edge_state == 0:
             if y > threshold:
-                waterline_row.append(row)
+                line_row.append(row)
                 edge_state = 1
         elif edge_state == 1:
             if y < threshold:
-                waterline_row.append(row)
+                line_row.append(row)
                 edge_state = 2
     
-    if len(waterline_row) == 2:
-        print("from total {}, detect head, water = {}, {}".format(h_gray, waterline_row[0], waterline_row[1]))
-        staffgauge_len = waterline_row[1] - waterline_row[0]
+    if len(line_row) == 2:
+        print("from total {}, head, water = {}, {}".format(h_gray, line_row[0], line_row[1]))
+        staffgauge_len = line_row[1] - line_row[0]
+    elif len(line_row) == 1:
+        print("can't find water line, head, water = {}, {}".format(line_row[0], h_gray))
+        staffgauge_len = h_gray - line_row[0]
     else:
-        print("can't find waterline")
+        print("can't find any line")
         staffgauge_len = h_gray
 
     # find actual lenght (meter) with linear regression model
