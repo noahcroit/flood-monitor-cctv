@@ -36,8 +36,12 @@ def measure_staffgauge_len(image_path):
     # convert to hsv colorspace
     hsv = cv2.cvtColor(img_crop, cv2.COLOR_BGR2HSV)
 
-    # lower bound and upper bound for Yellow color
-    lower_color = np.array([20, 90, 90])
+    # lower bound and upper bound for Yellow color (Daylight)
+    #lower_color = np.array([20, 90, 90])
+    #upper_color = np.array([30, 255, 255])
+    
+    # lower bound and upper bound for Yellow color (Night with LED lighting, Kinda white)
+    lower_color = np.array([0, 0, 180])
     upper_color = np.array([30, 255, 255])
 
     # find the colors within the boundaries
@@ -57,7 +61,7 @@ def measure_staffgauge_len(image_path):
     cv2.waitKey(0)
 
     # apply hole filling to binary image
-    kernel_size = (5, 5)
+    kernel_size = (7, 7)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
     closing = cv2.morphologyEx(thresh, cv2.MORPH_CLOSE, kernel)
     cv2.imshow("Filling Image", closing)
@@ -81,7 +85,7 @@ def measure_staffgauge_len(image_path):
     yd = 0
     y  = 0
     x  = 0
-    a  = 0.2
+    a  = 0.12
     waterline_row = []
     threshold = (mean - std)*0.4
     edge_state=0
@@ -135,6 +139,7 @@ def measure_staffgauge_len(image_path):
     print("staff len = {} from total {}".format(staffgauge_len, h_gray))
     cv2.imshow("waterline result", img_waterline)
     cv2.waitKey(0)
+
 
 
 if __name__ == "__main__":
