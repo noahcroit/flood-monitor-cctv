@@ -361,9 +361,21 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     # convert to hsv colorspace
     hsv = cv2.cvtColor(img_crop, cv2.COLOR_BGR2HSV)
 
-    # lower bound and upper bound for Yellow color
-    lower_bound = np.array([20, 90, 90])
-    upper_bound = np.array([30, 255, 255])
+    # Select Color of Staffgauge
+    import datetime
+    now = datetime.datetime.now()
+    hour = now.hour
+    if hour >= 6 and hour <= 18:
+        print("Day mode")
+        # lower bound and upper bound for Yellow color (Day)
+        lower_bound = np.array([20, 90, 90])
+        upper_bound = np.array([30, 255, 255])
+    else:
+        print("Night mode")
+        # lower bound and upper bound for Yellow color (Night with LED lighting, Kinda white)
+        lower_bound = np.array([0, 0, 180])
+        upper_bound = np.array([30, 255, 255])
+
 
     # find the colors within the boundaries
     mask = cv2.inRange(hsv, lower_bound, upper_bound)
@@ -377,7 +389,7 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     ret, img_binary = cv2.threshold(gray, 70, 255, 0)
 
     # apply hole filling to binary image
-    kernel_size = (5, 5)
+    kernel_size = (7, 7)
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, kernel_size)
     closing = cv2.morphologyEx(img_binary, cv2.MORPH_CLOSE, kernel)
 
@@ -395,14 +407,14 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     # Find mean and STD of gray value to calculate the threshold
     mean = np.mean(sum_gray)
     std  = np.std(sum_gray)
-    threshold = (mean - std)*0.4
+    threshold = (mean - std)*0.25
     
     # Filter the sum_gray waveform
     sum_gray_filter = []
     yd = 0
     y  = 0
     x  = 0
-    a_filter = 0.2
+    a_filter = 0.12
     edge_state = 0
     line_row = []
     for row in range(h_gray):
