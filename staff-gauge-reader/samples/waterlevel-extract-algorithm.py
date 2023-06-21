@@ -37,12 +37,12 @@ def measure_staffgauge_len(image_path):
     hsv = cv2.cvtColor(img_crop, cv2.COLOR_BGR2HSV)
 
     # lower bound and upper bound for Yellow color (Daylight)
-    #lower_color = np.array([20, 90, 90])
-    #upper_color = np.array([30, 255, 255])
+    lower_color = np.array([20, 90, 90])
+    upper_color = np.array([30, 255, 255])
     
     # lower bound and upper bound for Yellow color (Night with LED lighting, Kinda white)
-    lower_color = np.array([0, 0, 180])
-    upper_color = np.array([30, 255, 255])
+    #lower_color = np.array([0, 0, 180])
+    #upper_color = np.array([30, 255, 255])
 
     # find the colors within the boundaries
     mask = cv2.inRange(hsv, lower_color, upper_color)
