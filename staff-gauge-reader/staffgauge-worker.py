@@ -10,7 +10,7 @@ import base64
 
 
 
-# Global Variables for Threads 
+# Global Variables for Threads
 snapshot_isrun = True
 frame_yolo = None
 lock = threading.Lock()
@@ -348,6 +348,7 @@ def task_json_to_redis(q_redis, tagname):
 
                 # Send JSON message to Server and App
                 r.set(tagname, json_obj)
+                print("redis data sent")
             time.sleep(0.5)
 
         except Exception as e:
@@ -445,7 +446,11 @@ def measure_waterlevel(img, x1, x2, y1, y2, coeff):
     # find actual lenght (meter) with linear regression model
     len_meter = regression_model_staffgauge(staffgauge_len, img.shape[0], coeff)
 
-    return round(len_meter, 2)
+    # absolute waterlevel
+    total_len = 4
+    waterlevel = total_len - len_meter + 0.1
+
+    return round(waterlevel, 2)
 
 def regression_model_staffgauge(staffgauge_len, frame_height, coeff):
     a0 = coeff['a0']
