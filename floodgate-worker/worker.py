@@ -4,6 +4,7 @@ import async_timeout
 import queue
 import argparse
 import json
+from pymodbus.client import ModbusTcpClient
 
 
 
@@ -45,6 +46,8 @@ async def modbus_worker(q_write_msg, q_read_msg):
 
     # Modbus Device initialize
     print("Modbus Initialize")
+    client = ModbusTcpClient('127.0.0.1')
+    client.connect()
     await asyncio.sleep(3)
     
     while True:
@@ -56,9 +59,13 @@ async def modbus_worker(q_write_msg, q_read_msg):
                 if ch == tagname_floodgate_up:
                     # write MODBUS, multi-coil
                     print("Write MODBUS!!!!!!!!!!!!!!!!!, command=UP")
+                    #if not val == 0:
+                    #    client.write_coils(address=160, values=[1, 0], slave=1)
                 elif ch == tagname_floodgate_down:
                     # write MODBUS, multi-coil
                     print("Write MODBUS!!!!!!!!!!!!!!!!!, command=DOWN")
+                    #if not val == 0:
+                    #    client.write_coils(address=320, values=[1, 0], slave=1)
             except:
                 print("Write MODBUS fail!")
             await asyncio.sleep(0.2)
@@ -77,6 +84,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
 
             print("Read floodgate position")
             value = 2
+            client.read_holding_registers(address=14000, count=1, slave=1)
             q_read_msg.put([tagname_floodgate_pos, value])
             await asyncio.sleep(0.2)
         except:
