@@ -46,7 +46,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
 
     # Modbus Device initialize
     print("Modbus Initialize")
-    client = ModbusTcpClient('127.0.0.1')
+    client = ModbusTcpClient('192.168.0.50')
     client.connect()
     await asyncio.sleep(3)
     
@@ -59,13 +59,17 @@ async def modbus_worker(q_write_msg, q_read_msg):
                 if ch == tagname_floodgate_up:
                     # write MODBUS, multi-coil
                     print("Write MODBUS!!!!!!!!!!!!!!!!!, command=UP")
-                    #if not val == 0:
-                    #    client.write_coils(address=160, values=[1, 0], slave=1)
+                    if not val == 0:
+                        client.write_coils(address=160, values=[1, 0], slave=0)
+                        await asyncio.sleep(1)
+                        client.write_coils(address=160, values=[0, 0], slave=0)
                 elif ch == tagname_floodgate_down:
                     # write MODBUS, multi-coil
                     print("Write MODBUS!!!!!!!!!!!!!!!!!, command=DOWN")
-                    #if not val == 0:
-                    #    client.write_coils(address=320, values=[1, 0], slave=1)
+                    if not val == 0:
+                        client.write_coils(address=320, values=[1, 0], slave=0)
+                        await asyncio.sleep(1)
+                        client.write_coils(address=320, values=[0, 0], slave=0)
             except:
                 print("Write MODBUS fail!")
             await asyncio.sleep(0.2)
@@ -73,19 +77,17 @@ async def modbus_worker(q_write_msg, q_read_msg):
         # Read from device section
         try:
             print("Read coil for floodgate up")
-            value = 0
-            q_read_msg.put([tagname_floodgate_up, value])
+            #q_read_msg.put([tagname_floodgate_up, value])
             await asyncio.sleep(0.2)
 
             print("Read coil for floodgate down")
-            value = 1
-            q_read_msg.put([tagname_floodgate_down, value])
+            #q_read_msg.put([tagname_floodgate_down, value])
             await asyncio.sleep(0.2)
 
             print("Read floodgate position")
-            value = 2
-            client.read_holding_registers(address=14000, count=1, slave=1)
-            q_read_msg.put([tagname_floodgate_pos, value])
+            #rr = client.read_holding_registers(address=14000, count=1, slave=0)
+            #value = rr.register[0]/60*2
+            #q_read_msg.put([tagname_floodgate_pos, value])
             await asyncio.sleep(0.2)
         except:
             print("Read MODBUS fail!")
