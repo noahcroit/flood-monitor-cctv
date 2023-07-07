@@ -46,7 +46,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
 
     # Modbus Device initialize
     print("Modbus Initialize")
-    client = ModbusTcpClient('127.0.0.1')
+    client = ModbusTcpClient('192.168.0.50')
     client.connect()
     await asyncio.sleep(3)
 
@@ -90,12 +90,14 @@ async def modbus_worker(q_write_msg, q_read_msg):
 
             print("Read floodgate position")
             response = client.read_holding_registers(address=14000, count=1, slave=0)
-            value = rr.register
+            value = response.registers[0]
+            value = value/60*2.5
             print(value)
-            #q_read_msg.put([tagname_floodgate_pos, value])
-            await asyncio.sleep(0.2)
-        except:
+            q_read_msg.put([tagname_floodgate_pos, value])
+            await asyncio.sleep(1)
+        except Exception as e:
             print("Read MODBUS fail!")
+            print(e)
 
 
 

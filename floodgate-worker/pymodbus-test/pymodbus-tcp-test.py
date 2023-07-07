@@ -25,7 +25,7 @@ def test_hold_register(mbclient):
     try:
         time.sleep(1)
         response = mbclient.read_holding_registers(address=14000, count=1, slave=0)
-        print(response.registers)
+        print(response.registers[0])
     except Exception as e:
         print(e)
 
@@ -35,10 +35,12 @@ def main():
     print("pymodbus TCP testing...")
     time.sleep(1)
 
-    client = ModbusTcpClient('127.0.0.1')
+    client = ModbusTcpClient('192.168.0.50')
     client.connect()
-    test_coil(client)
-    test_hold_register(client)
+    #test_coil(client)
+    while True:
+        test_hold_register(client)
+        time.sleep(0.2)
     print("test end")
 
 
