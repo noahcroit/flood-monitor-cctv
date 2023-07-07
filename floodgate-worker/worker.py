@@ -46,10 +46,10 @@ async def modbus_worker(q_write_msg, q_read_msg):
 
     # Modbus Device initialize
     print("Modbus Initialize")
-    client = ModbusTcpClient('192.168.0.50')
+    client = ModbusTcpClient('127.0.0.1')
     client.connect()
     await asyncio.sleep(3)
-    
+
     while True:
         # Write to device section
         if not q_write_msg.empty():
@@ -77,16 +77,21 @@ async def modbus_worker(q_write_msg, q_read_msg):
         # Read from device section
         try:
             print("Read coil for floodgate up")
+            #response = client.read_coils(address=160, count=8, slave=0)
+            #value = response.registers
             #q_read_msg.put([tagname_floodgate_up, value])
-            await asyncio.sleep(0.2)
+            #await asyncio.sleep(0.2)
 
             print("Read coil for floodgate down")
+            #response = client.read_coils(address=320, count=8, slave=0)
+            #value = response.registers
             #q_read_msg.put([tagname_floodgate_down, value])
-            await asyncio.sleep(0.2)
+            #await asyncio.sleep(0.2)
 
             print("Read floodgate position")
-            #rr = client.read_holding_registers(address=14000, count=1, slave=0)
-            #value = rr.register[0]/60*2
+            response = client.read_holding_registers(address=14000, count=1, slave=0)
+            value = rr.register
+            print(value)
             #q_read_msg.put([tagname_floodgate_pos, value])
             await asyncio.sleep(0.2)
         except:
