@@ -91,7 +91,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
             print("Read floodgate position")
             response = client.read_holding_registers(address=14000, count=1, slave=0)
             value = response.registers[0]
-            value = value/60*2.5
+            value = (2.5/60)*value
             print(value)
             q_read_msg.put([tagname_floodgate_pos, value])
             await asyncio.sleep(1)
