@@ -55,6 +55,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
         if not q_write_msg.empty():
             [ch, val] = q_write_msg.get()
             ch = ch.strip('settag:')
+            await asyncio.sleep(1)
             try:
                 if ch == tagname_floodgate_up:
                     # write MODBUS, multi-coil
@@ -72,7 +73,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
                         client.write_coils(address=320, values=[0, 0], slave=0)
             except:
                 print("Write MODBUS fail!")
-            await asyncio.sleep(0.2)
+                await asyncio.sleep(5)
 
         # Read from device section
         try:
@@ -98,6 +99,7 @@ async def modbus_worker(q_write_msg, q_read_msg):
         except Exception as e:
             print("Read MODBUS fail!")
             print(e)
+            await asyncio.sleep(5)
 
 
 
