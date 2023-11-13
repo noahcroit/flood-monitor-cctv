@@ -23,12 +23,18 @@ def task_snapshot(queue_snapshot, source, source_type):
     print("start capture")
     try:
         # looping
+        skip_cnt = 0
         while stream.isOpened() and snapshot_isrun:
             ret, frame = stream.read()
             if not frame is None:
-                queue_snapshot.put(frame) # put frame into queue
-            if source_type == 'video':
-                time.sleep(1.5) # slow down the snapshot in video mode to prevent memory usage creep
+                if source_type == 'video':
+                    skip_cnt += 1
+                    if skip_cnt >= 2000:
+                        queue_snapshot.put(frame) # put frame into queue
+                        skip_cnt = 0
+                else:
+                    queue_snapshot.put(frame) # put frame into queue
+
         stream.release()
         snapshot_isrun = False
     except:
